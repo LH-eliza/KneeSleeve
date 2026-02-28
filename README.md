@@ -1,6 +1,6 @@
 # KneeSleeve
 
-KneeSleeve is a lightweight web app that runs directly on an ESP32 and serves as the device’s built-in user interface. The ESP32 hosts the web page and exposes a WebSocket interface so users can connect to the device from a phone, tablet, or computer and interact with it in real time.
+KneeSleeve is a lightweight web app that runs directly on an ESP32 and serves as the device’s built-in user interface. The ESP32 hosts the web page and exposes a WebSocket interface so users can connect to the device from a phone, tablet, or computer and interact with it in real time. Focuses on recovery and rehabilitation using IMUs, Wireless Shield for Muscle Sensor Data Transmission, and ESP32 WROOM. 
 
 This project is designed specifically to fit within the ESP32’s limited memory/flash constraints while still providing a responsive, modern-feeling UI.
 
@@ -9,6 +9,8 @@ This project is designed specifically to fit within the ESP32’s limited memory
 - Hosts a web UI from the ESP32 (the ESP32 is the server/host)
 - Lets users connect to the device from their own browser
 - Communicates with the ESP32 using WebSockets for low-latency, real-time updates
+- Allows users to use the application with the KneeSleeve and get accurate measurements of their shin and thigh movement (connected via KneeSleeve)
+- Focuses on rehabilitation and recovery of the elderly, recovering patients, and any user who wants to have data/accuracy
 - Provides a way to configure device networking (Wi‑Fi / “internet through settings”)
 
 ## Why WebSockets
