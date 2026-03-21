@@ -1,6 +1,6 @@
 # KneeSleeve
 
-Truth North Biomedical competition - code
+Truth North Biomedical Competition - Code Breakdown
 
 Firmware for a dual-leg knee monitoring setup: each leg uses ESP32-S3 modules for IMU/encoder data and MyoWare EMG over BLE, with an ESP32 WROOM hub collecting streams over ESP-NOW. A separate sketch (`uobionics_final.ino`) implements a self-contained demo on one ESP32 with Wi-Fi access point, HTTP server, WebSockets, and on-board IMUs.
 
