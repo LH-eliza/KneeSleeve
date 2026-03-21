@@ -1,59 +1,126 @@
 # KneeSleeve
 
-Truth North Biomedical Competition - Code Breakdown
+Documentation for the uOBionics knee monitoring firmware (True North Biomedical Competition, University of Ottawa).
 
-Firmware for a dual-leg knee monitoring setup: each leg uses ESP32-S3 modules for IMU/encoder data and MyoWare EMG over BLE, with an ESP32 WROOM hub collecting streams over ESP-NOW. A separate sketch (`uobionics_final.ino`) implements a self-contained demo on one ESP32 with Wi-Fi access point, HTTP server, WebSockets, and on-board IMUs.
+---
 
-## Repository layout
+## 1. Overview
 
-| Path | Role |
-|------|------|
-| `leg1/leg1_imu.ino` | Leg 1: dual LSM6DSO (I2C `0x6A`), rotary encoder, ESP-NOW to WROOM, receives calibration / encoder-reset commands |
-| `leg1/leg1_emg.ino` | Leg 1: BLE clients to two MyoWare shields, filters samples, ESP-NOW EMG packets to WROOM |
-| `leg1/wroom_leg1_1.ino` | Hub firmware scoped to Leg 1 only (use if that leg talks to its own WROOM) |
-| `leg2/leg2_imu.ino` | Leg 2: same IMU/encoder/ESP-NOW behavior as Leg 1 |
-| `leg2/leg2_emg.ino` | Leg 2: same EMG pipeline as Leg 1 with Leg 2 MyoWare MACs |
-| `leg2/wroom_leg2_1.ino` | Hub firmware scoped to Leg 2 only |
-| `wroom_all_legs/wroom_all_legs.ino` | **Recommended** if one WROOM receives all four senders (matches shared `wroomMAC[]` in the leg sketches) |
-| `address finder/ESP_MAC_FINDER.ino` | Prints STA MAC for ESP-NOW peer setup |
-| `address finder/myoware_MAC_FINDER.ino` | BLE scan listing for MyoWare shield addresses |
-| `uobionics_final.ino` | Standalone uOBionics UI: soft AP `uOBionics` / password in sketch, web UI on port 80, WebSocket on 81, IMUs on GPIO 18/19 and 32/33 |
+The distributed firmware reads knee-related motion (dual IMUs, rotary encoder) and muscle activity (MyoWare over BLE) from two legs. Leg nodes are ESP32-S3 boards. A central ESP32 WROOM aggregates data over ESP-NOW and exposes it on USB serial at 115200 baud for logging or downstream software.
 
-There are no `src/`, `web/`, or `data/` trees in this repository; each Arduino sketch lives in its own folder (or at the root for `uobionics_final.ino`).
+Data path: leg sensors → leg ESP32-S3 firmware → WROOM hub → host serial.
 
-## Architecture (distributed leg firmware)
+---
 
-- **Per leg, two ESP32-S3 boards** (typical split): one runs `leg*_imu.ino`, one runs `leg*_emg.ino`.
-- **One ESP32 WROOM** (or one per leg, if you change `wroomMAC[]` accordingly) runs `wroom_all_legs.ino` or the matching `wroom_leg*_1.ino`.
-- **Wi-Fi channel** is fixed to **1** on leg EMG, leg IMU (via `esp_wifi_set_channel`), and WROOM hubs so ESP-NOW stays aligned.
-- **ESP-NOW peer**: all leg sketches use the same hub address `08:3A:F2:52:88:E8` in `wroomMAC[]` (adjust if your WROOM’s STA MAC differs).
-- **EMG path**: MyoWare BLE devices are selected by MAC strings in `leg1_emg.ino` / `leg2_emg.ino`; service UUID used in code is `ec3af789-2154-49f4-a9fc-bc6c88e9e930`.
+## 2. Architecture
 
-Packet shapes are shared between senders and hubs: `ImuPacket` (knee angle, raw angle, encoder, accel vectors, calibration flags) and `EmgPacket` (two channels plus connection flags). The IMU firmware accepts a one-byte `CmdPacket`: `1` runs straight-leg calibration, `2` resets the encoder state.
+- **Leg node (IMU):** One ESP32-S3 per leg runs `legN_imu.ino`. Samples IMUs and encoder, sends `ImuPacket` to the hub, receives `CmdPacket` for calibration and encoder reset.
+- **Leg node (EMG):** One ESP32-S3 per leg runs `legN_emg.ino`. Connects to two MyoWare devices over BLE, sends `EmgPacket` to the hub.
+- **Hub:** ESP32 WROOM runs `wroom_all_legs.ino` when a single hub serves both legs. Per-leg hub variants exist for dual-hub layouts.
+- **Radio:** ESP-NOW, fixed Wi-Fi channel **1** on leg and hub firmware so links stay aligned.
 
-## Hardware notes (from sketches)
+---
 
-- **Leg IMU / EMG (ESP32-S3)**: board profile **ESP32S3 Dev Module**, **USB CDC On Boot: Enabled**, serial **115200**.
-- **Leg IMU**: encoder on GPIO 10/11; IMU buses SDA/SCL 39/35 and 18/15; LSM6DSO WHO_AM_I `0x6C`; LED GPIO 2.
-- **WROOM hub**: ESP32 family dev module; STA mode, channel 1, ESP-NOW peer list must include each sender’s STA MAC.
+## 3. Firmware modules
 
-## Configuration checklist
+| Path | Description |
+|------|-------------|
+| `leg1/leg1_imu.ino`, `leg2/leg2_imu.ino` | IMU + encoder; ESP-NOW TX/RX with hub |
+| `leg1/leg1_emg.ino`, `leg2/leg2_emg.ino` | BLE MyoWare clients; ESP-NOW TX to hub |
+| `wroom_all_legs/wroom_all_legs.ino` | Hub for four senders (L1 IMU, L1 EMG, L2 IMU, L2 EMG) |
+| `leg1/wroom_leg1_1.ino`, `leg2/wroom_leg2_1.ino` | Hub restricted to one leg’s IMU + EMG MACs |
+| `address finder/ESP_MAC_FINDER.ino` | Prints STA MAC for ESP-NOW addressing |
+| `address finder/myoware_MAC_FINDER.ino` | BLE scan output for MyoWare MAC discovery |
+| `uobionics_final.ino` | Standalone ESP32: soft AP, HTTP + WebSocket UI, local IMUs; not part of the ESP-NOW leg network |
 
-1. Confirm the WROOM STA MAC (e.g. with `ESP_MAC_FINDER.ino` on that board) matches `wroomMAC[]` on every leg sender.
-2. On each leg ESP32-S3, run `ESP_MAC_FINDER.ino` and paste those addresses into the hub sketch (`LEG1_IMU_MAC`, `LEG1_EMG_MAC`, etc.).
-3. Use `myoware_MAC_FINDER.ino` (or your phone’s BLE tools) to set `MAC_A` / `MAC_B` in the correct `leg*_emg.ino`.
-4. If you use **one** hub for both legs, prefer `wroom_all_legs/wroom_all_legs.ino` and configure all four sender MACs.
+Sketches are organized as Arduino projects (one `.ino` per directory, except `uobionics_final.ino` at repository root).
 
-## WROOM serial commands (`wroom_all_legs.ino`)
+---
 
-At 115200 baud: `1` Leg 1 cal, `2` Leg 1 encoder reset, `3` Leg 2 cal, `4` Leg 2 encoder reset. Per-leg hub sketches use `1`/`c` and `2`/`r` for cal and encoder reset on that leg only.
+## 4. Build environment
 
-Hub output is line-oriented text (IMU and EMG fields); `SERIAL_THROTTLE_MS` in the hub sketch limits print rate.
+- **Arduino IDE** (or compatible toolchain) with **esp32** board package installed.
+- **Leg IMU / EMG:** Board `ESP32S3 Dev Module`, **USB CDC On Boot: Enabled**.
+- **WROOM hub:** Standard ESP32 dev module profile matching the physical board.
+- **Serial:** 115200 baud for monitor and calibration commands on the hub.
 
-## `uobionics_final.ino`
+---
 
-Independent of the leg/WROOM ESP-NOW network: one ESP32 hosts the full web experience and reads two on-board IMUs. Default AP credentials and pin map are defined at the top of the file. Treat network passwords as sensitive if you deploy hardware.
+## 5. Configuration
 
-## License and contributing
+### 5.1 Hub address (`wroomMAC[]`)
 
-Add a license and contribution policy if you publish or share the repo.
+Leg sketches contain `wroomMAC[]` pointing at the WROOM STA address. Default in source: `08:3A:F2:52:88:E8`. Replace with the hub’s actual MAC if different (use `ESP_MAC_FINDER.ino` on the hub).
+
+### 5.2 Sender addresses (hub sketch)
+
+The hub sketch lists each leg IMU and EMG STA MAC (`LEG1_IMU_MAC`, `LEG1_EMG_MAC`, `LEG2_IMU_MAC`, `LEG2_EMG_MAC`). Populate using `ESP_MAC_FINDER.ino` on each sender board.
+
+### 5.3 MyoWare BLE (`MAC_A`, `MAC_B`)
+
+`leg1_emg.ino` and `leg2_emg.ino` filter advertisers by MAC string. Set from `myoware_MAC_FINDER.ino` or an external BLE scanner.
+
+---
+
+## 6. Setup procedure
+
+1. Program the WROOM with `wroom_all_legs.ino` (or the appropriate `wroom_legN_1.ino` if using separate hubs).
+2. Read the hub MAC with `ESP_MAC_FINDER.ino`; update `wroomMAC[]` in all leg IMU and EMG sketches.
+3. Read each leg board MAC with `ESP_MAC_FINDER.ino`; update the hub’s `LEG*_IMU_MAC` / `LEG*_EMG_MAC` arrays.
+4. Update `MAC_A` / `MAC_B` in each `legN_emg.ino`.
+5. Power leg nodes; open serial on the hub at 115200 and verify IMU/EMG lines.
+
+---
+
+## 7. Hub serial interface
+
+### 7.1 `wroom_all_legs.ino`
+
+| Input | Action |
+|-------|--------|
+| `1` | Send calibrate command to leg 1 IMU |
+| `2` | Send encoder reset to leg 1 IMU |
+| `3` | Send calibrate command to leg 2 IMU |
+| `4` | Send encoder reset to leg 2 IMU |
+
+### 7.2 `wroom_leg1_1.ino` / `wroom_leg2_1.ino`
+
+| Input | Action |
+|-------|--------|
+| `1` or `c` | Calibrate IMU for that leg |
+| `2` or `r` | Encoder reset for that leg |
+
+Hub output is text lines per packet type. `SERIAL_THROTTLE_MS` in the hub source limits print rate.
+
+---
+
+## 8. Protocol reference
+
+- **ImuPacket:** Knee angle, raw angle, encoder angle, encoder count, six accelerometer floats, calibration flags (`calDone`, `calOffset`, `encReset`).
+- **EmgPacket:** `emg1`, `emg2`, `conn1`, `conn2`.
+- **CmdPacket (to IMU):** `1` = straight-leg calibration sequence; `2` = encoder reset.
+- **EMG BLE service UUID:** `ec3af789-2154-49f4-a9fc-bc6c88e9e930`.
+
+---
+
+## 9. Leg IMU hardware (from sketch)
+
+| Function | GPIO / parameter |
+|----------|-------------------|
+| Encoder DT / CLK | 10, 11 |
+| IMU bus 1 SDA / SCL | 39, 35 |
+| IMU bus 2 SDA / SCL | 18, 15 |
+| I2C device address | `0x6A` (LSM6DSO-class, WHO_AM_I `0x6C`) |
+| LED | 2 |
+
+---
+
+## 10. `uobionics_final.ino`
+
+Single-board firmware: Wi-Fi soft AP, web server on port 80, WebSockets on port 81, IMUs on pins 18/19 and 32/33. SSID, password, and pins are defined at the top of the file. Does not participate in the leg ESP-NOW topology.
+
+---
+
+## 11. License and contributions
+
+Specify a license and contribution policy when distributing the repository.
