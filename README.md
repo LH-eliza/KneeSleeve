@@ -123,4 +123,6 @@ Single-board firmware: Wi-Fi soft AP, web server on port 80, WebSockets on port 
 
 ## 11. License and contributions
 
+Case study presentation for UI/UX research https://www.figma.com/deck/vemuB4uZVGfRQWW4DStVgY
+
 Specify a license and contribution policy when distributing the repository.
