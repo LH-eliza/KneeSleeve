@@ -1,0 +1,1 @@
+{"type":"error","error":{"type":"not_found_error","message":"File not found in container: /mnt/user-data/outputs/myoware_scanner.ino","details":{"error_visibility":"user_facing"}},"request_id":"req_011CZ1r8EPN29N4rhtR4EwKc"}
