@@ -125,4 +125,6 @@ Single-board firmware: Wi-Fi soft AP, web server on port 80, WebSockets on port 
 
 Case study presentation for UI/UX research https://www.figma.com/deck/vemuB4uZVGfRQWW4DStVgY
 
+Developed by Anas Bourfia and Lauren Hong
+
 Specify a license and contribution policy when distributing the repository.
