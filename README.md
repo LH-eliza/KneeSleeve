@@ -2,6 +2,8 @@
 
 Documentation for the uOBionics knee monitoring firmware (True North Biomedical Competition, University of Ottawa).
 
+Updated full UI design system & case study Nov 2026
+
 ---
 
 ## 1. Overview
